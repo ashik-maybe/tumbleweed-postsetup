@@ -37,7 +37,7 @@ PACKAGES_TO_REMOVE=(
   gnome-tweaks
   gnome-user-docs
   gnome-weather
-#   gpk-update-viewer
+  gpk-update-viewer
   libreoffice-*
   lightsoff
   opensuse-welcome
@@ -159,6 +159,20 @@ enable_fstrim() {
   fi
 }
 
+# === STEP 5: Clean up orphaned packages ===
+cleanup_orphans() {
+  info "Cleaning up orphaned packages..."
+  local orphans
+  orphans=$(zypper packages --orphaned | tail -n +6 | awk '{print $3}' | grep -v '^$')
+  if [ -z "$orphans" ]; then
+    success "No orphaned packages found."
+    return
+  fi
+  printf "  Removing orphans: %s\n" $orphans
+  zypper remove -y --clean-deps $orphans
+  success "Orphan cleanup complete."
+}
+
 # === MAIN ===
 main() {
   ensure_root
@@ -168,7 +182,8 @@ main() {
   echo "  1. Speed up zypper (deltarpm + fast mirrors)"
   echo "  2. Remove unused GNOME/Firefox/LibreOffice bloat"
   echo "  3. Enable full multimedia via Packman (ffmpeg, codecs)"
-  echo "  4. Enable fstrim.timer for SSD longevity"
+  echo "  4. Cleanup orphaned packages"
+  echo "  5. Enable fstrim.timer for SSD longevity"
   echo
   read -p "Continue? (y/N): " -n1 -r
   echo
@@ -179,6 +194,7 @@ main() {
   optimize_zypper
   remove_bloat
   enable_packman_ffmpeg
+  cleanup_orphans
   enable_fstrim
 
   success "Optimization complete! Reboot if you removed core desktop components."
