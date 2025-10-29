@@ -1,0 +1,2 @@
+# opensuse-tumbleweed-postsetup
+ 
