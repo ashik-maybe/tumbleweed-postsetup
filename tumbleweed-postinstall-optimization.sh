@@ -16,7 +16,7 @@ PACKAGES_TO_REMOVE=(
   dconf-editor
   evince
   evolution
-  firefox
+#   firefox
   gimp
   gnome-boxes
   gnome-calendar
