@@ -52,6 +52,7 @@ readonly TARGET_REMOVALS=(
   "seahorse"
   "shotwell"
   "simple-scan"
+  "snapshot"
   "swell-foop"
   "totem"
   "xscreensaver"
