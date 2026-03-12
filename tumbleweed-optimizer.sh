@@ -62,23 +62,11 @@ configure_codecs() {
   zypper --non-interactive install --no-recommends "${CODEC_PACKAGES[@]}"
 }
 
-configure_flatpak() {
-  if ! command -v flatpak &>/dev/null; then
-    log_info "Installing Flatpak..."
-    zypper --non-interactive install --no-recommends flatpak
-  fi
-
-  if ! flatpak remotes | grep -q "flathub"; then
-    log_info "Adding Flathub remote..."
-    flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-  fi
-}
-
 cleanup_bloat() {
   log_info "Cleaning bloat..."
   # Zypper remove is naturally idempotent (won't error if already gone)
   zypper --non-interactive remove --clean-deps "${TARGET_REMOVALS[@]}" || true
-  
+
   # Only add locks for packages not already locked
   local current_locks
   current_locks=$(zypper locks)
@@ -122,7 +110,6 @@ main() {
 
   optimize_zypper
   configure_codecs
-  configure_flatpak
   cleanup_bloat
   optimize_performance
 
