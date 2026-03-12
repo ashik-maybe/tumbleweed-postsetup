@@ -1,14 +1,14 @@
-# Tumbleweed Post-Setup
+# Tumbleweed Post-Setup Scripts
 
-Minimalist orchestrator to optimize **openSUSE Tumbleweed**.
+An orchestrator to optimize **openSUSE Tumbleweed**.
 
 ## 🚀 Quick Start
 
 ```bash
 git clone https://github.com/ashik-maybe/tumbleweed-postsetup.git
 cd tumbleweed-postsetup
-chmod +x tumbleweed-postinstall-optimization.sh
-./tumbleweed-postinstall-optimization.sh
+chmod +x tumbleweed-optimizer.sh
+./tumbleweed-optimizer.sh
 
 ```
 
@@ -29,11 +29,8 @@ sudo zypper in -y git-core
 * **Codecs**: Full Packman vendor change (H.264, FFmpeg, etc.).
 * **Bloat**: Removes GNOME Maps, Weather, Music, and LibreOffice.
 * **Performance**: Enables `zRAM` (zstd) and `fstrim`.
-* **Dev**: Pre-installs `bun` and `uv`.
 
 > [!TIP]
 > **Reboot** after execution to apply the new multimedia libraries and zRAM configuration.
 
 ---
-
-**Would you like me to add a short "Removal List" table so users know exactly what is being deleted?**
