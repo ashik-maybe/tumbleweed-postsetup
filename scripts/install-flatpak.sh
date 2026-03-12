@@ -7,61 +7,51 @@ set -euo pipefail
 IFS=$'\n\t'
 
 readonly LOG_PREFIX="[FLATPAK-SETUP]"
-# Identify the actual user if running under sudo
-readonly REAL_USER="${SUDO_USER:-$USER}"
 
 log_info()    { printf "%s (INFO): %s\n" "${LOG_PREFIX}" "$*"; }
 log_success() { printf "%s (OK): %s\n" "${LOG_PREFIX}" "$*"; }
 
-setup_core_flatpak() {
-    # 1. Install Flatpak binaries (Requires Root)
+setup_core() {
+    # Install binary
     if ! command -v flatpak &>/dev/null; then
-        log_info "Installing Flatpak system binaries..."
+        log_info "Installing Flatpak..."
         zypper --non-interactive install --no-recommends flatpak
     fi
 
-    # 2. Add Flathub remote (Requires Root for system-wide access)
+    # Add Flathub
     if ! flatpak remotes | grep -q "flathub"; then
-        log_info "Adding Flathub remote to system..."
+        log_info "Adding Flathub..."
         flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
     fi
 }
 
 install_flatseal() {
-    local app_id="com.github.tchx84.Flatseal"
-
-    # Check and Install as the REAL_USER
-    if ! sudo -u "$REAL_USER" flatpak list --user --app | grep -q "$app_id"; then
-        log_info "Installing Flatseal for user: $REAL_USER..."
-        sudo -u "$REAL_USER" flatpak install --user -y flathub "$app_id"
+    if ! flatpak list --app | grep -q "com.github.tchx84.Flatseal"; then
+        log_info "Installing Flatseal..."
+        flatpak install -y flathub com.github.tchx84.Flatseal
     else
-        log_info "Flatseal is already installed for $REAL_USER."
+        log_info "Flatseal already present."
     fi
 }
 
 install_warehouse() {
-    local app_id="io.github.flattool.Warehouse"
-
-    if ! sudo -u "$REAL_USER" flatpak list --user --app | grep -q "$app_id"; then
-        log_info "Installing Warehouse for user: $REAL_USER..."
-        sudo -u "$REAL_USER" flatpak install --user -y flathub "$app_id"
+    if ! flatpak list --app | grep -q "io.github.flattool.Warehouse"; then
+        log_info "Installing Warehouse..."
+        flatpak install -y flathub io.github.flattool.Warehouse
     else
-        log_info "Warehouse is already installed for $REAL_USER."
+        log_info "Warehouse already present."
     fi
 }
 
 main() {
-    # Self-elevate to root for the system-level tasks
+    # Ensure root for the whole process
     [[ "${EUID}" -ne 0 ]] && exec sudo "$0" "$@"
 
-    # 1. System tasks (as root)
-    setup_core_flatpak
-
-    # 2. User tasks (dropping privileges internally)
+    setup_core
     install_flatseal
     install_warehouse
 
-    log_success "Setup complete. Core is System; Apps are User ($REAL_USER)."
+    log_success "Flatpak setup complete."
 }
 
 main "$@"
