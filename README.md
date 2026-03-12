@@ -1,32 +1,39 @@
-# openSUSE Tumbleweed Post-Setup
+# Tumbleweed Post-Setup
 
-A collection of scripts to optimize a fresh **openSUSE Tumbleweed + GNOME** install.
+Minimalist orchestrator to optimize **openSUSE Tumbleweed**.
 
-## How to use (with Git)
+## 🚀 Quick Start
 
 ```bash
 git clone https://github.com/ashik-maybe/tumbleweed-postsetup.git
 cd tumbleweed-postsetup
 chmod +x tumbleweed-postinstall-optimization.sh
 ./tumbleweed-postinstall-optimization.sh
+
 ```
+
+## ⚡ Fast Bootstrap (No Git)
+
+If `zypper` is slow, run this to optimize throughput and install Git:
+
+```bash
+echo -e "[main]\ndownload.max_concurrent_connections = 10\ndeltarpm = false" | sudo tee /etc/zypp/zypp.conf
+sudo env ZYPP_CURL2=1 zypper ref
+sudo zypper in -y git-core
+
+```
+
+## ✨ Key Optimizations
+
+* **Zypper**: 10x parallel downloads + `ZYPP_CURL2` enabled.
+* **Codecs**: Full Packman vendor change (H.264, FFmpeg, etc.).
+* **Bloat**: Removes GNOME Maps, Weather, Music, and LibreOffice.
+* **Performance**: Enables `zRAM` (zstd) and `fstrim`.
+* **Dev**: Pre-installs `bun` and `uv`.
+
+> [!TIP]
+> **Reboot** after execution to apply the new multimedia libraries and zRAM configuration.
 
 ---
 
-## 🔥 No Git? Fix slow zypper first, then install Git
-
-On a fresh install, `zypper` can be painfully slow. **Paste this in your terminal first** to enable fast mirrors and deltarpm:
-
-```bash
-sudo rm -f /etc/zypp/repos.d/*.repo
-sudo zypper ar -cfG https://download.opensuse.org/tumbleweed/repo/oss/ repo-oss
-sudo zypper ar -cfG https://download.opensuse.org/tumbleweed/repo/non-oss/ repo-non-oss
-echo -e "[main]\ndeltarpm = true\ndeltarpm.always = true" | sudo tee /etc/zypp/zypp.conf
-sudo zypper refresh
-sudo zypper install -y --no-recommends git-core
-```
-
-Now you can clone and run the script normally!
-
-> ✅ Uses **MirrorCache** (`download.opensuse.org`) → auto-selects the fastest local mirror.
-> ✅ Enables **deltarpm** → smaller, faster updates.
+**Would you like me to add a short "Removal List" table so users know exactly what is being deleted?**
