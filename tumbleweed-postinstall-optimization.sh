@@ -108,7 +108,7 @@ main() {
   optimize_zypper
   configure_codecs
   cleanup_bloat # Uses the removal list and addlock logic from previous version
-  setup_dev_tools
+  # setup_dev_tools
   optimize_performance
 
   log_success "Orchestration complete. Please reboot."
