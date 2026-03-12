@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # openSUSE Tumbleweed Post-Install Orchestrator
-# optimized for performance, proprietary codecs, and bloat removal.
+# optimized for performance, proprietary codecs, bloat removal, and Flatpak.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -90,6 +90,18 @@ configure_codecs() {
   zypper --non-interactive install --no-recommends "${CODEC_PACKAGES[@]}"
 }
 
+configure_flatpak() {
+  log_info "Configuring Flatpak and Flathub repository..."
+  
+  if ! command -v flatpak &>/dev/null; then
+    zypper --non-interactive install --no-recommends flatpak
+  fi
+
+  # Add Flathub remote (System-wide)
+  flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  log_success "Flathub repository integrated."
+}
+
 cleanup_bloat() {
   log_info "Removing bloat and locking packages..."
   zypper --non-interactive remove --clean-deps "${TARGET_REMOVALS[@]}" || true
@@ -119,10 +131,11 @@ main() {
 
   optimize_zypper
   configure_codecs
+  configure_flatpak
   cleanup_bloat
   optimize_performance
 
-  log_success "System optimized. Please reboot to complete the process."
+  log_success "System optimized. Please reboot."
 }
 
 main "$@"
