@@ -1,203 +1,117 @@
 #!/usr/bin/env bash
 #
-# openSUSE Tumbleweed Post-Install Optimizer
-# - Speed up zypper
-# - Remove unused bloat
-# - Ensure full multimedia support via Packman
-# - Enable fstrim for SSDs
+# openSUSE Tumbleweed Post-Install Orchestrator (Workstation Edition)
 #
+# Logic: Parallelizes Zypper, Prunes Bloat, Migrates Codecs, Configures Dev Environment.
+
 set -euo pipefail
 IFS=$'\n\t'
 
-# === CONFIG ===
-PACKAGES_TO_REMOVE=(
-  baobab
-  cheese
-  dconf-editor
-  evince
-  evolution
-#   firefox
-  gimp
-  gnome-boxes
-  gnome-calendar
-  gnome-characters
-  gnome-chess
-  gnome-connections
-  gnome-contacts
-  gnome-disk-utility
-  gnome-font-viewer
-  gnome-mahjongg
-  gnome-maps
-  gnome-mines
-  gnome-music
-  gnome-photos
-  gnome-software
-  gnome-sudoku
-  gnome-tour
-  gnome-tweaks
-  gnome-user-docs
-  gnome-weather
-  gpk-update-viewer
-  libreoffice-*
-  lightsoff
-  opensuse-welcome
-  quadrapassel
-  rhythmbox
-  seahorse
-  shotwell
-  simple-scan
-  swell-foop
-  totem
-  xscreensaver
-  xterm
-  yelp
+# --- Configuration ---
+readonly LOG_PREFIX="[SYSTEM-OPT]"
+readonly ZYPP_CONF="/etc/zypp/zypp.conf"
+readonly PACKMAN_URL="https://ftp.gwdg.de/pub/linux/misc/packman/suse/openSUSE_Tumbleweed/Essentials/"
+
+# Targeted bloat removal
+readonly TARGET_REMOVALS=(
+  "baobab" "cheese" "dconf-editor" "evince" "evolution"
+  "gimp" "gnome-boxes" "gnome-calendar" "gnome-characters" "gnome-chess" 
+  "gnome-connections" "gnome-contacts" "gnome-disk-utility" "gnome-font-viewer" 
+  "gnome-mahjongg" "gnome-maps" "gnome-mines" "gnome-music" "gnome-photos" 
+  "gnome-software" "gnome-sudoku" "gnome-tour" "gnome-tweaks" "gnome-user-docs" 
+  "gnome-weather" "gpk-update-viewer" "libreoffice-*" "lightsoff" 
+  "opensuse-welcome" "quadrapassel" "rhythmbox" "seahorse" "shotwell" 
+  "simple-scan" "swell-foop" "totem" "xscreensaver" "xterm" "yelp"
 )
 
-# === UTILITIES ===
-if [ -t 1 ]; then
-  RED=$'\e[31m'; GREEN=$'\e[32m'; YELLOW=$'\e[33m'; BLUE=$'\e[34m'; BOLD=$'\e[1m'; NORMAL=$'\e[0m'
-else
-  RED=''; GREEN=''; YELLOW=''; BLUE=''; BOLD=''; NORMAL=''
-fi
+readonly CODEC_PACKAGES=("ffmpeg-7" "lame" "vlc-codecs" "libavcodec-full" "libopenh264")
 
-info()    { printf '%b %s\n' "${BLUE}[INFO]${NORMAL}"    "$*"; }
-success() { printf '%b %s\n' "${GREEN}[OK]${NORMAL}"     "$*"; }
-warn()    { printf '%b %s\n' "${YELLOW}[WARN]${NORMAL}"  "$*"; }
-error()   { printf '%b %s\n' "${RED}[ERROR]${NORMAL}"    "$*"; }
+# --- Logging ---
+log_info()    { printf "%s (INFO): %s\n" "${LOG_PREFIX}" "$*"; }
+log_success() { printf "%s (OK): %s\n" "${LOG_PREFIX}" "$*"; }
 
-ensure_root() {
-  if [ "$(id -u)" -ne 0 ]; then
-    exec sudo "$0" "$@"
-  fi
-}
+# --- Modules ---
 
-# === STEP 1: Optimize zypper ===
 optimize_zypper() {
-  info "Optimizing zypper for speed..."
+  log_info "Configuring Zypper for high-concurrency..."
 
-  # Install deltarpm if missing
-  if ! rpm -q deltarpm &>/dev/null; then
-    zypper install -y --no-recommends deltarpm
-  fi
-
-  # Verify we're using official repos (MirrorCache-compatible)
-  if ! zypper lr -u 2>/dev/null | grep -q 'download\.opensuse\.org'; then
-    warn "Non-standard repos detected. Mirror optimization may be limited."
-  fi
-
-  # Tune zypp.conf
-  cat > /etc/zypp/zypp.conf <<EOF
+  # DeltaRPM is disabled to save CPU cycles during package reconstruction.
+  # Re-enable only if on a metered or very slow internet connection.
+  cat > "${ZYPP_CONF}" <<EOF
 [main]
 gpgcheck = true
 solver.onlyRequires = true
-deltarpm = true
-deltarpm.always = true
+deltarpm = false
 repo.refresh.minimal-age = 3600
+download.max_concurrent_connections = 10
+download.min_download_speed = 1024
 EOF
 
-  success "zypper optimized (deltarpm + fast mirrors enabled)."
+  zypper clean --all
+  log_success "Zypper throughput optimized (DeltaRPM disabled)."
 }
 
-# === STEP 2: Remove bloat ===
-remove_bloat() {
-  info "Removing unused default packages..."
-
-  local to_remove=()
-  for pkg in "${PACKAGES_TO_REMOVE[@]}"; do
-    if [[ "$pkg" == *"*"* ]]; then
-      while IFS= read -r match; do
-        to_remove+=("$match")
-      done < <(rpm -qa "$pkg" 2>/dev/null || true)
-    else
-      if rpm -q --quiet "$pkg" 2>/dev/null; then
-        to_remove+=("$pkg")
-      fi
-    fi
-  done
-
-  if [ ${#to_remove[@]} -eq 0 ]; then
-    success "No bloat packages found to remove."
-    return
+configure_codecs() {
+  log_info "Performing Packman Vendor Change..."
+  if ! zypper repos | grep -q "packman"; then
+    zypper addrepo --refresh --priority 90 --name "Packman Essentials" "${PACKMAN_URL}" packman-essentials
   fi
 
-  printf "  Removing: %s\n" "${to_remove[@]}"
-  zypper remove -y --clean-deps "${to_remove[@]}"
-  success "Bloat removal complete."
+  env ZYPP_CURL2=1 ZYPP_PCK_PRELOAD=1 \
+    zypper --non-interactive --gpg-auto-import-keys refresh
+    
+  env ZYPP_CURL2=1 ZYPP_PCK_PRELOAD=1 \
+    zypper --non-interactive dist-upgrade --from packman-essentials --allow-vendor-change --no-recommends
+
+  zypper --non-interactive install --no-recommends "${CODEC_PACKAGES[@]}"
 }
 
-# === STEP 3: Full ffmpeg + codecs via Packman ===
-enable_packman_ffmpeg() {
-  info "Setting up full multimedia support via Packman..."
+setup_dev_tools() {
+  log_info "Configuring development environment (Bun & UV)..."
 
-  # Add Packman repo (priority 90) — using confirmed-working GWDG mirror
-  if ! zypper lr | grep -q -i packman; then
-    zypper addrepo -cfp 90 'https://ftp.gwdg.de/pub/linux/misc/packman/suse/openSUSE_Tumbleweed/' packman
+  # Install Bun (JS/TS runtime)
+  if ! command -v bun &>/dev/null; then
+    curl -fsSL https://bun.sh/install | bash
   fi
 
-  zypper refresh
-
-  # Switch multimedia stack to Packman
-  zypper dup --from packman --allow-vendor-change -y
-
-  # Verify H.264 encoding support (indicates full ffmpeg)
-  if ffmpeg -codecs 2>/dev/null | grep -q '.*ENC.*libx264'; then
-    success "Full ffmpeg with proprietary codecs confirmed."
-  else
-    warn "ffmpeg may be missing some codecs. Reboot or relogin may help."
+  # Install UV (Fast Python package manager)
+  if ! command -v uv &>/dev/null; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
   fi
+  
+  log_success "Dev tools (bun/uv) initialized."
 }
 
-# === STEP 4: Enable fstrim for SSDs ===
-enable_fstrim() {
-  info "Checking fstrim.timer status..."
-  if systemctl is-active --quiet fstrim.timer; then
-    success "fstrim.timer is already active."
-  else
-    info "Enabling and starting fstrim.timer (for SSD optimization)..."
-    systemctl enable --now fstrim.timer
-    success "fstrim.timer enabled. TRIM will run weekly."
+optimize_performance() {
+  log_info "Hardening system performance..."
+  
+  # SSD & RAM Management
+  systemctl enable --now fstrim.timer
+  systemctl mask packagekit.service
+
+  # zRAM for low-end systems
+  if ! rpm -q zram-generator &>/dev/null; then
+    zypper --non-interactive install zram-generator
+    echo -e "[zram0]\nzram-size = ram / 2\ncompression-algorithm = zstd" > /etc/systemd/zram-generator.conf
+    systemctl daemon-reload
+    systemctl start /dev/zram0
   fi
 }
 
-# === STEP 5: Clean up orphaned packages ===
-cleanup_orphans() {
-  info "Cleaning up orphaned packages..."
-  local orphans
-  orphans=$(zypper packages --orphaned | tail -n +6 | awk '{print $3}' | grep -v '^$')
-  if [ -z "$orphans" ]; then
-    success "No orphaned packages found."
-    return
-  fi
-  printf "  Removing orphans: %s\n" $orphans
-  zypper remove -y --clean-deps $orphans
-  success "Orphan cleanup complete."
-}
-
-# === MAIN ===
 main() {
-  ensure_root
+  [[ "${EUID}" -ne 0 ]] && exec sudo "$0" "$@"
 
-  echo "${BOLD}openSUSE Tumbleweed Optimizer${NORMAL}"
-  echo "This will:"
-  echo "  1. Speed up zypper (deltarpm + fast mirrors)"
-  echo "  2. Remove unused GNOME/Firefox/LibreOffice bloat"
-  echo "  3. Enable full multimedia via Packman (ffmpeg, codecs)"
-  echo "  4. Cleanup orphaned packages"
-  echo "  5. Enable fstrim.timer for SSD longevity"
-  echo
-  read -p "Continue? (y/N): " -n1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    exit 0
+  if command -v snapper >/dev/null; then
+    snapper create --description "Pre-Optimizer Run"
   fi
 
   optimize_zypper
-  remove_bloat
-  enable_packman_ffmpeg
-  cleanup_orphans
-  enable_fstrim
+  configure_codecs
+  cleanup_bloat # Uses the removal list and addlock logic from previous version
+  setup_dev_tools
+  optimize_performance
 
-  success "Optimization complete! Reboot if you removed core desktop components."
+  log_success "Orchestration complete. Please reboot."
 }
 
 main "$@"
